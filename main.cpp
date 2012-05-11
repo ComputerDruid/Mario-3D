@@ -11,6 +11,7 @@
 #define PRINT_FPS
 //#define OBJLOADER_DEBUG
 //#define LITE_MODE // less enemies for faster loading
+//#define STEREO_3D
 
 #include <string>
 #include <time.h>
@@ -1301,15 +1302,32 @@ void timer(int value) {
 	if(freezetime <= 0) glutPostRedisplay();
 }
 
-void gameDisplay() {
-  //clear model view at begginning of display
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+static const int EYE_LEFT = -1;
+static const int EYE_RIGHT = 1;
+static const int EYE_BOTH = 0;
 
-	view = glm::lookAt(camcube->position, camcube->position + lookat, glm::vec3(0.0, 1.0, 0.0));
+void gameDisplay_h(int eye) {
+	//clear model view at begginning of display
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glm::vec3 shift_dir = glm::normalize(glm::cross(glm::vec3(0.0, 1.0, 0.0), lookat))*.4f;
+	if (eye == EYE_LEFT) {
+		glDrawBuffer(GL_BACK_LEFT);
+	}
+	else if (eye == EYE_RIGHT) {
+		shift_dir *= -1.0f;
+		//glTranslatef(0.0f, 0.0f, -0.5f);
+		glDrawBuffer(GL_BACK_RIGHT);
+	}
+	else {
+		shift_dir *= 0;
+	}
+
+	view = glm::lookAt(camcube->position + shift_dir, camcube->position + shift_dir + lookat, glm::vec3(0.0, 1.0, 0.0));
 	projection = glm::perspective(45.0f, 1.0f*screen_width/screen_height, 0.1f, 5000.0f);
 
-	gluLookAt(camcube->position.x, camcube->position.y, camcube->position.z, camcube->position.x + lookat.x, camcube->position.y + lookat.y, camcube->position.z + lookat.z, 0.0, 1.0, 0.0);
+	gluLookAt(camcube->position.x + shift_dir.x, camcube->position.y + shift_dir.y, camcube->position.z + shift_dir.z, camcube->position.x + shift_dir.x + lookat.x, camcube->position.y + shift_dir.y + lookat.y, camcube->position.z + shift_dir.z + lookat.z, 0.0, 1.0, 0.0);
 
 	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1355,6 +1373,15 @@ void gameDisplay() {
 	glDisableVertexAttribArray(attribute_texcoord);
 	glUseProgram(0);
 } // display function for game state
+
+void gameDisplay() {
+#ifdef STEREO_3D
+	gameDisplay_h(EYE_LEFT);
+	gameDisplay_h(EYE_RIGHT);
+#else
+	gameDisplay_h(EYE_BOTH);
+#endif
+}
 
 void menuDisplay() {
 	view = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, 1.0, 0.0));
@@ -2418,7 +2445,11 @@ int main(int argc, char* argv[]) {
 	initAudio();
 
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE | GLUT_DEPTH);
+	unsigned int display_mode = GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE | GLUT_DEPTH;
+#ifdef STEREO_3D
+	display_mode |= GLUT_STEREO;
+#endif
+	glutInitDisplayMode(display_mode);
 	glutInitWindowSize(screen_width, screen_height);
 	windowid = glutCreateWindow("Mario 3D");
 	if(fullscreen) glutFullScreen();
